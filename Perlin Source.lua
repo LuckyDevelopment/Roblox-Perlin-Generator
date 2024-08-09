@@ -32,39 +32,55 @@ local function GetColor(y : number) : Color3
     return Colors[closetKey]
 end
 
+local function InverseLerp(value : number, start : number, endingValue : number) : number
+    return (value - start) / (endingValue - start)
+end
 
-function Perlin.Generate(Scale : number, Frequency : number, Amplitude : number, ChunkSize : number, Seed : number)
+local function SmoothNumber(baseY : number, threshold : number) : number
+    if baseY <= threshold then
+        return 0
+    else
+        local lerpedValue = InverseLerp(baseY, threshold, 1)
+        return lerpedValue
+    end
+end
+
+function Perlin.Generate(Scale : number, Frequency : number, Amplitude : number, ChunkSize : number, SmoothingFactor : number, Seed : number)
     -- Remove all previous blocks.
     for _, object in pairs(TerrainParts:GetChildren()) do
         object:Destroy()
     end
-    
+
     -- Generate random offsets.
     local random = Random.new(Seed)
     local xOffset = random:NextNumber(-100000, 100000)
     local zOffset = random:NextNumber(-100000, 100000)
-    
+
     -- Loop through each chunk.
     for x = 0, MapSize do
         for z = 0, MapSize do
             -- Change sizes of sample X and Z.
             local sampleX = x / Scale * Frequency + xOffset
             local sampleZ = z / Scale * Frequency + zOffset
-            
+
             -- Generate the perlin noise?!?!
             local baseY = math.clamp((math.noise(sampleX, sampleZ) + 0.5), 0, 1)
-            local y = baseY * Amplitude
+            local preservedBaseY = baseY
             
+            baseY = SmoothNumber(baseY, SmoothingFactor)
+            
+            local y = baseY * Amplitude
+
             -- Get the correct CFrame.
             local BlockCFrame = CFrame.new(x * ChunkSize, y * ChunkSize, z * ChunkSize)
-              
+
             -- Create a new part for the terrain.
             local clone = PerlinBlock:Clone()
             clone.CFrame = BlockCFrame
-            clone.Color = GetColor(baseY)
-            clone.Size = Vector3.new(ChunkSize, ChunkSize, ChunkSize)
+            clone.Color = GetColor(preservedBaseY)
+            clone.Size = Vector3.new(ChunkSize, y * (ChunkSize + 1) + 1, ChunkSize)
             clone.Parent = TerrainParts   
-            
+
         end
         task.wait()
     end
